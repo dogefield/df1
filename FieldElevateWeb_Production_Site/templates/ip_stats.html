@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP Tracking Statistics</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+        .stat-card h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .recent-requests {
+            margin-top: 20px;
+        }
+        .request-item {
+            padding: 10px;
+            border-bottom: 1px solid #dee2e6;
+            font-family: monospace;
+        }
+        .request-item:last-child {
+            border-bottom: none;
+        }
+        .refresh-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .refresh-btn:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>IP Tracking Statistics</h1>
+        <button class="refresh-btn" onclick="refreshStats()">Refresh Stats</button>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Requests</h3>
+                <div class="stat-value" id="total-requests">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Vercel IP 1 (100.20.92.101)</h3>
+                <div class="stat-value" id="ip-1-count">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Vercel IP 2 (44.225.181.72)</h3>
+                <div class="stat-value" id="ip-2-count">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Vercel IP 3 (44.227.217.144)</h3>
+                <div class="stat-value" id="ip-3-count">-</div>
+            </div>
+        </div>
+
+        <div class="recent-requests">
+            <h2>Recent Requests</h2>
+            <div id="recent-requests-list"></div>
+        </div>
+    </div>
+
+    <script>
+        async function refreshStats() {
+            try {
+                const response = await fetch('/ip-stats');
+                const data = await response.json();
+                
+                // Update total requests
+                document.getElementById('total-requests').textContent = data.total_requests;
+                
+                // Update IP counts
+                document.getElementById('ip-1-count').textContent = data.ip_counts['100.20.92.101'] || 0;
+                document.getElementById('ip-2-count').textContent = data.ip_counts['44.225.181.72'] || 0;
+                document.getElementById('ip-3-count').textContent = data.ip_counts['44.227.217.144'] || 0;
+                
+                // Update recent requests
+                const requestsList = document.getElementById('recent-requests-list');
+                requestsList.innerHTML = '';
+                data.recent_requests.forEach(request => {
+                    const div = document.createElement('div');
+                    div.className = 'request-item';
+                    div.textContent = request;
+                    requestsList.appendChild(div);
+                });
+            } catch (error) {
+                console.error('Error fetching stats:', error);
+            }
+        }
+
+        // Load stats on page load
+        refreshStats();
+        
+        // Refresh stats every 30 seconds
+        setInterval(refreshStats, 30000);
+    </script>
+</body>
+</html> 

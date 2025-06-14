@@ -14,6 +14,7 @@ from sentry_sdk.integrations.flask import FlaskIntegration
 from prometheus_flask_exporter import PrometheusMetrics
 from flask_monitoringdashboard import Dashboard
 from openai import OpenAI
+import json
 
 # Load environment variables
 load_dotenv()
@@ -32,6 +33,13 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Create a file handler for IP logging
+ip_logger = logging.getLogger('ip_tracker')
+ip_logger.setLevel(logging.INFO)
+ip_handler = logging.FileHandler('ip_tracking.log')
+ip_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+ip_logger.addHandler(ip_handler)
 
 # Verify required environment variables
 required_env_vars = ['OPENAI_API_KEY', 'SECRET_KEY']
@@ -62,6 +70,24 @@ CACHE_TIMEOUT = 300  # 5 minutes
 # Initialize OpenAI client
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
+# Known IPs to monitor
+MONITORED_IPS = {
+    '100.20.92.101': 'Vercel IP 1',
+    '44.225.181.72': 'Vercel IP 2',
+    '44.227.217.144': 'Vercel IP 3'
+}
+
+def track_ip(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        client_ip = request.remote_addr
+        if client_ip in MONITORED_IPS:
+            ip_logger.info(f"Monitored IP Access - IP: {client_ip} ({MONITORED_IPS[client_ip]}) - "
+                         f"Path: {request.path} - Method: {request.method} - "
+                         f"User Agent: {request.headers.get('User-Agent', 'Unknown')}")
+        return f(*args, **kwargs)
+    return decorated_function
+
 def cache_response(timeout=CACHE_TIMEOUT):
     def decorator(f):
         @wraps(f)
@@ -77,8 +103,18 @@ def cache_response(timeout=CACHE_TIMEOUT):
         return decorated_function
     return decorator
 
-# Add performance metrics to routes
+# Apply IP tracking to all routes
+@app.before_request
+def before_request():
+    client_ip = request.remote_addr
+    if client_ip in MONITORED_IPS:
+        ip_logger.info(f"Monitored IP Access - IP: {client_ip} ({MONITORED_IPS[client_ip]}) - "
+                      f"Path: {request.path} - Method: {request.method} - "
+                      f"User Agent: {request.headers.get('User-Agent', 'Unknown')}")
+
+# Add IP tracking to existing routes
 @app.route('/')
+@track_ip
 @metrics.counter('home_page_views', 'Number of home page views')
 @cache_response(timeout=60)  # Cache home page for 1 minute
 def home():
@@ -90,6 +126,7 @@ def home():
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 @app.route('/admin')
+@track_ip
 @metrics.counter('admin_page_views', 'Number of admin page views')
 @cache_response(timeout=30)  # Cache admin page for 30 seconds
 def admin():
@@ -101,6 +138,7 @@ def admin():
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 @app.route('/investor')
+@track_ip
 @metrics.counter('investor_page_views', 'Number of investor page views')
 @cache_response(timeout=30)  # Cache investor page for 30 seconds
 def investor():
@@ -112,6 +150,7 @@ def investor():
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 @app.route('/health')
+@track_ip
 @metrics.gauge('health_check', 'Health check status')
 def health_check():
     try:
@@ -161,6 +200,7 @@ def health_check():
         return jsonify({"status": "unhealthy", "error": str(e)}), 500
 
 @app.route('/static/<path:filename>')
+@track_ip
 @metrics.counter('static_file_requests', 'Number of static file requests')
 def serve_static(filename):
     try:
@@ -170,6 +210,7 @@ def serve_static(filename):
         return jsonify({"error": "File not found"}), 404
 
 @app.route('/generate', methods=['POST'])
+@track_ip
 def generate_text():
     try:
         data = request.get_json()
@@ -195,8 +236,37 @@ def generate_text():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/generate-page')
+@track_ip
 def generate_page():
     return render_template('generate.html')
+
+@app.route('/ip-stats')
+def ip_stats():
+    try:
+        with open('ip_tracking.log', 'r') as f:
+            logs = f.readlines()
+        
+        stats = {
+            'total_requests': len(logs),
+            'ip_counts': {},
+            'recent_requests': []
+        }
+        
+        for log in logs[-100:]:  # Get last 100 requests
+            if any(ip in log for ip in MONITORED_IPS):
+                stats['recent_requests'].append(log.strip())
+                ip = next(ip for ip in MONITORED_IPS if ip in log)
+                stats['ip_counts'][ip] = stats['ip_counts'].get(ip, 0) + 1
+        
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"Error getting IP stats: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/ip-stats-page')
+@track_ip
+def ip_stats_page():
+    return render_template('ip_stats.html')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
