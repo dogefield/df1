@@ -1,5 +1,5 @@
 # Internal dashboard routing script
-from flask import Flask, render_template, jsonify, send_from_directory
+from flask import Flask, render_template, jsonify, send_from_directory, request, Response, stream_with_context
 import os
 import logging
 import traceback
@@ -13,6 +13,7 @@ import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 from prometheus_flask_exporter import PrometheusMetrics
 from flask_monitoringdashboard import Dashboard
+from openai import OpenAI
 
 # Load environment variables
 load_dotenv()
@@ -57,6 +58,9 @@ if os.environ.get('FLASK_ENV') == 'development':
 # Simple in-memory cache
 cache = {}
 CACHE_TIMEOUT = 300  # 5 minutes
+
+# Initialize OpenAI client
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 def cache_response(timeout=CACHE_TIMEOUT):
     def decorator(f):
@@ -164,6 +168,35 @@ def serve_static(filename):
     except Exception as e:
         logger.error(f"Error serving static file {filename}: {str(e)}")
         return jsonify({"error": "File not found"}), 404
+
+@app.route('/generate', methods=['POST'])
+def generate_text():
+    try:
+        data = request.get_json()
+        prompt = data.get('prompt', '')
+        
+        def generate():
+            # Create a streaming response from OpenAI
+            stream = client.chat.completions.create(
+                model="gpt-4",  # or your preferred model
+                messages=[{"role": "user", "content": prompt}],
+                stream=True
+            )
+            
+            # Stream the response
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        
+        return Response(stream_with_context(generate()), mimetype='text/event-stream')
+    
+    except Exception as e:
+        app.logger.error(f"Error in text generation: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/generate-page')
+def generate_page():
+    return render_template('generate.html')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
