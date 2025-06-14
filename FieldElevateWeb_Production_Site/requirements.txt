@@ -16,4 +16,7 @@ MarkupSafe==2.1.3
 whitenoise==6.6.0
 psutil==5.9.8
 Flask-Caching==2.1.0
-Flask-Compress==1.14 
+Flask-Compress==1.14
+openai==1.12.0
+langchain==0.1.9
+python-dotenv==1.0.0 
