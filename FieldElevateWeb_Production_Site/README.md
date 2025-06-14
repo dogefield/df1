@@ -2,6 +2,8 @@
 
 A comprehensive field management solution built with Flask, featuring performance optimizations and modern web practices.
 
+*Last updated: March 19, 2024*
+
 ## Features
 
 - **Dashboard Views**
