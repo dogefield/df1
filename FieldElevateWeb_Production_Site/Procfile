@@ -1,1 +1,1 @@
-web: gunicorn main_app:app 
+web: cd FieldElevateWeb_Production_Site && gunicorn main_app:app 
