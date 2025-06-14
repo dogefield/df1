@@ -4,6 +4,26 @@ A comprehensive field management solution built with Flask, featuring performanc
 
 *Last updated: March 19, 2024*
 
+## Environment Variables
+
+The application requires certain environment variables to be set. Create a `.env` file in the root directory with the following variables:
+
+```bash
+# Required Variables
+OPENAI_API_KEY=your_openai_api_key_here
+SECRET_KEY=your_secret_key_here
+
+# Optional Variables
+FLASK_ENV=development  # or production
+FLASK_APP=main_app.py
+```
+
+**Important Security Notes:**
+1. Never commit the `.env` file to version control
+2. Keep your API keys secure and rotate them regularly
+3. Use different API keys for development and production
+4. The `.env` file is automatically ignored by git
+
 ## Features
 
 - **Dashboard Views**

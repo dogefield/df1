@@ -8,6 +8,10 @@ from werkzeug.middleware.profiler import ProfilerMiddleware
 import datetime
 from functools import wraps
 import time
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -16,7 +20,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Verify required environment variables
+required_env_vars = ['OPENAI_API_KEY', 'SECRET_KEY']
+missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+if missing_vars:
+    logger.error(f"Missing required environment variables: {', '.join(missing_vars)}")
+    raise EnvironmentError(f"Missing required environment variables: {', '.join(missing_vars)}")
+
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Enable profiling in development
@@ -86,6 +98,12 @@ def health_check():
         memory_info = process.memory_info()
         memory_usage = memory_info.rss / 1024 / 1024  # Convert to MB
         
+        # Check environment variables (without exposing values)
+        env_vars_status = {
+            var: "configured" if os.getenv(var) else "missing"
+            for var in required_env_vars
+        }
+        
         return jsonify({
             "status": "healthy",
             "timestamp": datetime.datetime.utcnow().isoformat(),
@@ -96,6 +114,10 @@ def health_check():
             "memory": {
                 "usage_mb": round(memory_usage, 2),
                 "status": "healthy" if memory_usage < 500 else "warning"
+            },
+            "environment": {
+                "variables": env_vars_status,
+                "status": "healthy" if all(os.getenv(var) for var in required_env_vars) else "warning"
             }
         }), 200
     except Exception as e:
