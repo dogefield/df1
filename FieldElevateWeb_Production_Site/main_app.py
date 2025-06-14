@@ -33,7 +33,12 @@ def investor():
         logger.error(f"Error rendering investor_view.html: {str(e)}")
         return "An error occurred", 500
 
+# Health check endpoint
+@app.route('/health')
+def health_check():
+    return "OK", 200
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     logger.info(f"Starting server on port {port}")
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=False)
