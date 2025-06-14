@@ -1,1 +1,0 @@
-{ "framework": "vite", "settings": { "buildCommand": "npm run build", "outputDirectory": "dist", "startCommand": "npx serve -s dist" } }
