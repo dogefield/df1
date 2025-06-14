@@ -9,9 +9,21 @@ import datetime
 from functools import wraps
 import time
 from dotenv import load_dotenv
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
+from prometheus_flask_exporter import PrometheusMetrics
+from flask_monitoringdashboard import Dashboard
 
 # Load environment variables
 load_dotenv()
+
+# Configure Sentry for error tracking
+sentry_sdk.init(
+    dsn=os.getenv('SENTRY_DSN'),
+    integrations=[FlaskIntegration()],
+    traces_sample_rate=1.0,
+    environment=os.getenv('FLASK_ENV', 'development')
+)
 
 # Configure logging
 logging.basicConfig(
@@ -30,6 +42,13 @@ if missing_vars:
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+# Initialize Prometheus metrics
+metrics = PrometheusMetrics(app)
+metrics.info('app_info', 'Application info', version='1.0.0')
+
+# Initialize Flask Monitoring Dashboard
+Dashboard.bind(app)
 
 # Enable profiling in development
 if os.environ.get('FLASK_ENV') == 'development':
@@ -54,7 +73,9 @@ def cache_response(timeout=CACHE_TIMEOUT):
         return decorated_function
     return decorator
 
+# Add performance metrics to routes
 @app.route('/')
+@metrics.counter('home_page_views', 'Number of home page views')
 @cache_response(timeout=60)  # Cache home page for 1 minute
 def home():
     try:
@@ -65,6 +86,7 @@ def home():
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 @app.route('/admin')
+@metrics.counter('admin_page_views', 'Number of admin page views')
 @cache_response(timeout=30)  # Cache admin page for 30 seconds
 def admin():
     try:
@@ -75,6 +97,7 @@ def admin():
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 @app.route('/investor')
+@metrics.counter('investor_page_views', 'Number of investor page views')
 @cache_response(timeout=30)  # Cache investor page for 30 seconds
 def investor():
     try:
@@ -85,6 +108,7 @@ def investor():
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 @app.route('/health')
+@metrics.gauge('health_check', 'Health check status')
 def health_check():
     try:
         logger.info("Health check requested")
@@ -104,6 +128,13 @@ def health_check():
             for var in required_env_vars
         }
         
+        # Get performance metrics
+        metrics_data = {
+            'response_times': metrics.get_metrics(),
+            'cache_hits': cache_size,
+            'memory_usage': memory_usage
+        }
+        
         return jsonify({
             "status": "healthy",
             "timestamp": datetime.datetime.utcnow().isoformat(),
@@ -118,13 +149,15 @@ def health_check():
             "environment": {
                 "variables": env_vars_status,
                 "status": "healthy" if all(os.getenv(var) for var in required_env_vars) else "warning"
-            }
+            },
+            "metrics": metrics_data
         }), 200
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}\n{traceback.format_exc()}")
         return jsonify({"status": "unhealthy", "error": str(e)}), 500
 
 @app.route('/static/<path:filename>')
+@metrics.counter('static_file_requests', 'Number of static file requests')
 def serve_static(filename):
     try:
         return send_from_directory('static', filename, cache_timeout=3600)  # Cache static files for 1 hour

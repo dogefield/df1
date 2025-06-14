@@ -16,6 +16,7 @@ SECRET_KEY=your_secret_key_here
 # Optional Variables
 FLASK_ENV=development  # or production
 FLASK_APP=main_app.py
+SENTRY_DSN=your_sentry_dsn_here  # for error tracking
 ```
 
 **Important Security Notes:**
@@ -23,6 +24,35 @@ FLASK_APP=main_app.py
 2. Keep your API keys secure and rotate them regularly
 3. Use different API keys for development and production
 4. The `.env` file is automatically ignored by git
+
+## Performance Monitoring
+
+The application includes several performance monitoring features:
+
+1. **Prometheus Metrics**
+   - Page view counters
+   - Response time tracking
+   - Resource usage monitoring
+   - Available at `/metrics` endpoint
+
+2. **Flask Monitoring Dashboard**
+   - Real-time performance metrics
+   - Request tracking
+   - Error monitoring
+   - Available at `/dashboard` endpoint
+
+3. **Sentry Integration**
+   - Error tracking
+   - Performance monitoring
+   - Real-time alerts
+   - Stack trace analysis
+
+4. **Health Checks**
+   - Detailed system status
+   - Cache performance
+   - Memory usage
+   - Environment variable status
+   - Available at `/health` endpoint
 
 ## Features
 
